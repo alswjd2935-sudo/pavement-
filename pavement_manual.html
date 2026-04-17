@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>포장 단위수량산출서</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-size:12px;background:#f0f2f5;padding:14px;}
+.wrap{max-width:960px;margin:0 auto;}
+.card{background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:12px;}
+.card-title{font-size:13px;font-weight:bold;color:#1a5276;margin-bottom:10px;}
+input[type=text],input[type=password]{border:1px solid #ccc;border-radius:4px;padding:6px 9px;font-family:inherit;font-size:12px;outline:none;}
+input[type=text]:focus,input[type=password]:focus{border-color:#1a73e8;}
+.btn{padding:6px 14px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:bold;}
+.b-blue{background:#1a73e8;color:#fff;}.b-blue:hover{background:#1558b0;}
+.b-green{background:#4a7c3f;color:#fff;}.b-green:hover{background:#2d5a27;}
+.b-gold{background:#b8860b;color:#fff;}
+.b-navy{background:#5b7fcb;color:#fff;}
+.b-orange{background:#e67e22;color:#fff;}
+.b-red{background:#c0392b;color:#fff;}
+.b-teal{background:#1d6f42;color:#fff;}
+.b-gray{background:#666;color:#fff;}
+.b-disabled{background:#aaa;color:#fff;cursor:default;}
+
+/* API 상태 */
+.status-box{font-size:11px;margin-top:6px;padding:5px 8px;border-radius:4px;}
+.s-ok{background:#e8f5e9;color:#2e7d32;}
+.s-err{background:#ffebee;color:#c62828;}
+.s-info{background:#e3f2fd;color:#1565c0;}
+
+/* 업로드 */
+.drop-zone{border:2px dashed #90caf9;border-radius:6px;padding:16px;text-align:center;cursor:pointer;background:#fafcff;position:relative;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .2s;}
+.drop-zone:hover{border-color:#1a73e8;background:#e8f4fd;}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-zone img{max-height:140px;max-width:100%;border-radius:4px;object-fit:contain;}
+.progress{background:#e0e0e0;border-radius:10px;height:6px;margin:6px 0;}
+.pbar{height:6px;border-radius:10px;background:linear-gradient(90deg,#1a73e8,#34a853);transition:width .4s;}
+.log-box{background:#1a1a2e;color:#81d4fa;border-radius:4px;padding:8px;font-size:10.5px;font-family:monospace;max-height:70px;overflow-y:auto;margin-top:6px;}
+
+/* 산출서 */
+.doc-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #1a73e8;}
+.meta-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.mg{display:flex;align-items:center;gap:4px;}
+.mg label{font-size:10px;color:#888;white-space:nowrap;}
+.mg input{border:none;border-bottom:1px solid #ccc;outline:none;font-family:inherit;font-size:12px;padding:1px 3px;background:transparent;width:110px;}
+.toolbar{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap;}
+
+table.qty{width:100%;border-collapse:collapse;font-size:12px;}
+table.qty th{background:#dce8f5;border:1px solid #888;padding:6px 4px;text-align:center;}
+table.qty td{border:1px solid #ccc;padding:3px 4px;vertical-align:middle;}
+table.qty td input{width:100%;border:none;outline:none;font-family:inherit;font-size:12px;background:transparent;padding:1px 2px;}
+tr.mat td{background:#fff;}
+tr.mat td:first-child{font-weight:bold;}
+tr.pum td{background:#fffbf0;}
+tr.pum td:first-child{color:#7a5f00;padding-left:14px;}
+tr.sec td{background:#e8f0e8;font-weight:bold;color:#2d5a27;}
+tr.nt td{background:#fffde7;font-size:11px;color:#666;}
+tr.mat:hover td{background:#f5fdf3;}
+tr.pum:hover td{background:#fff8e0;}
+.qv{background:#f5faf3!important;}
+.qv input{text-align:right!important;font-weight:bold!important;color:#1a5c10!important;}
+.qv-p{background:#fffbf0!important;}
+.qv-p input{text-align:right!important;font-weight:bold!important;color:#7a5f00!important;}
+td.basis{background:#fafafa!important;}
+td.basis input{font-size:11px;color:#444;}
+.del-btn{background:none;border:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0 2px;}
+.foot{margin-top:10px;font-size:11px;color:#777;background:#fafafa;border:1px solid #e0e0e0;border-radius:4px;padding:7px 12px;line-height:1.8;}
+
+@media print{
+  body{background:#fff;padding:0;}
+  .card:not(.result-card),.toolbar,.del-btn,.meta-row,.no-print{display:none!important;}
+  .result-card{box-shadow:none!important;padding:8px!important;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ① API 키 -->
+<div class="card no-print">
+  <div class="card-title">🔑 Google Gemini API 키 <span style="font-weight:normal;font-size:10px;color:#888;">(완전 무료 · 하루 1500회)</span></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input type="password" id="api-key" placeholder="AIza... 형태의 Gemini API 키" style="flex:1;min-width:200px;">
+    <button class="btn b-blue" onclick="saveKey()">저장</button>
+    <button class="btn b-gray" onclick="clearKey()">삭제</button>
+  </div>
+  <div id="api-st" class="status-box s-info">API 키를 입력하고 저장하세요.</div>
+  <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.6;">
+    📌 발급: <a href="https://aistudio.google.com" target="_blank" style="color:#1a73e8;">aistudio.google.com</a>
+    → 구글 로그인 → <b>Get API Key</b> → <b>Create API Key</b> → 복사<br>
+    🔒 키는 이 브라우저에만 저장되며 외부 서버로 전송되지 않습니다.
+  </div>
+</div>
+
+<!-- ② 이미지 업로드 -->
+<div class="card no-print">
+  <div class="card-title">📐 도면 이미지 업로드 → AI 자동 분석</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+    <div id="dz" class="drop-zone" style="flex:1;min-width:180px;"
+      ondrop="onDrop(event)" ondragover="event.preventDefault()">
+      <input type="file" id="fi" accept="image/*" onchange="onFile(event)">
+      <div id="dz-ph">
+        <div style="font-size:30px;margin-bottom:5px;">📂</div>
+        <div style="font-size:12px;color:#555;">클릭하거나 이미지 드래그</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">JPG · PNG · WebP</div>
+      </div>
+      <img id="prev" style="display:none;" alt="도면">
+      <button id="del-img" onclick="clearImg(event)"
+        style="display:none;position:absolute;top:4px;right:4px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:150px;">
+      <button id="ab" onclick="analyze()" class="btn b-disabled" disabled
+        style="padding:10px 16px;font-size:13px;">✨ AI 도면 분석</button>
+      <div id="pw" style="display:none;">
+        <div class="progress"><div class="pbar" id="pb" style="width:0%"></div></div>
+        <div id="pm" style="font-size:11px;color:#555;text-align:center;margin-top:2px;"></div>
+      </div>
+      <div id="lg" class="log-box" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 수량산출서 -->
+<div class="card result-card">
+  <div class="doc-hdr">
+    <input id="pname" value="" placeholder="포장 명칭 (AI 분석 후 자동 입력)"
+      style="font-size:15px;font-weight:bold;border:none;border-bottom:2px solid #1a73e8;outline:none;font-family:inherit;padding:2px 4px;width:300px;background:transparent;">
+    <span style="font-size:12px;color:#555;font-weight:bold;">단위 : M2</span>
+  </div>
+  <div class="meta-row no-print">
+    <div class="mg"><label>공사명</label><input id="mn" placeholder="공사명" style="width:140px;"></div>
+    <div class="mg"><label>발주처</label><input id="mc" placeholder="발주처"></div>
+    <div class="mg"><label>작성자</label><input id="ma" placeholder="작성자" style="width:80px;"></div>
+    <div class="mg"><label>작성일</label><input id="md" style="width:100px;"></div>
+  </div>
+  <div class="toolbar no-print">
+    <button class="btn b-green" onclick="addMat()">+ 자재</button>
+    <button class="btn b-gold" onclick="addPum()">+ 품</button>
+    <button class="btn b-navy" onclick="addSec()">▶ 구분</button>
+    <button class="btn b-orange" onclick="addNote()">※ 비고</button>
+    <button class="btn b-red" onclick="clearTb()">🗑 초기화</button>
+    <div style="flex:1"></div>
+    <button class="btn b-teal" onclick="exportXlsx()">📥 엑셀</button>
+    <button class="btn b-blue" onclick="window.print()">🖨 인쇄</button>
+  </div>
+  <table class="qty">
+    <thead>
+      <tr>
+        <th style="width:22%">공 종</th>
+        <th style="width:15%">규 격</th>
+        <th style="width:37%">산 출 근 거</th>
+        <th style="width:7%">단위</th>
+        <th style="width:11%">수 량</th>
+        <th style="width:4%" class="no-print"></th>
+      </tr>
+    </thead>
+    <tbody id="tb">
+      <tr id="empty-row"><td colspan="6" style="text-align:center;padding:28px;color:#bbb;border:1px solid #eee;">
+        도면 이미지를 업로드하고 AI 분석 버튼을 눌러주세요
+      </td></tr>
+    </tbody>
+  </table>
+  <div class="foot">
+    ※ 굵은 행: 자재 &nbsp;|&nbsp; 연노랑 행: 시공 품 &nbsp;|&nbsp; 2026년 건설공사 표준품셈 기준<br>
+    ※ 산출기준: <strong>M2당</strong> — 실제 면적(M2) × 각 수량 = 총수량
+  </div>
+</div>
+</div>
+
+<script>
+// ── 전역
+let API_KEY='', imgB64='', imgMime='', sid=0;
+const esc=s=>String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const f3=v=>Math.round(v*1000)/1000;
+const evalB=s=>{
+  try{
+    let c=s.replace(/\([^)]*[%할증][^)]*\)/g,'').replace(/[^0-9+\-*/.()]/g,'');
+    if(!c)return null;
+    const r=Function('"use strict";return('+c+')')();
+    return isNaN(r)||!isFinite(r)?null:f3(r);
+  }catch{return null;}
+};
+
+// ── API 키
+function saveKey(){
+  const k=document.getElementById('api-key').value.trim();
+  if(!k.startsWith('AIza')){setSt('err','⚠ AIza... 형태의 키를 입력해주세요.');return;}
+  API_KEY=k; localStorage.setItem('gk',k);
+  setSt('ok','✅ API 키 저장 완료! 이미지를 업로드하고 분석하세요.');
+  updBtn();
+}
+function clearKey(){API_KEY='';localStorage.removeItem('gk');document.getElementById('api-key').value='';setSt('info','API 키가 삭제되었습니다.');updBtn();}
+function setSt(t,m){const el=document.getElementById('api-st');el.className='status-box s-'+t;el.textContent=m;}
+function updBtn(){
+  const ok=!!API_KEY&&!!imgB64;
+  const b=document.getElementById('ab');
+  b.disabled=!ok; b.className='btn '+(ok?'b-blue':'b-disabled');
+}
+
+// ── 이미지
+function onFile(e){loadF(e.target.files[0]);}
+function onDrop(e){e.preventDefault();loadF(e.dataTransfer.files[0]);}
+function loadF(file){
+  if(!file||!file.type.startsWith('image/'))return;
+  imgMime=file.type;
+  const r=new FileReader();
+  r.onload=ev=>{
+    imgB64=ev.target.result.split(',')[1];
+    const p=document.getElementById('prev');
+    p.src=ev.target.result; p.style.display='block';
+    document.getElementById('dz-ph').style.display='none';
+    document.getElementById('del-img').style.display='block';
+    updBtn();
+  };
+  r.readAsDataURL(file);
+}
+function clearImg(e){
+  e.stopPropagation(); imgB64=''; imgMime='';
+  document.getElementById('prev').style.display='none';
+  document.getElementById('dz-ph').style.display='flex';
+  document.getElementById('del-img').style.display='none';
+  document.getElementById('fi').value='';
+  updBtn();
+}
+
+// ── Gemini 분석
+async function analyze(){
+  if(!API_KEY||!imgB64){return;}
+  document.getElementById('pw').style.display='block';
+  document.getElementById('lg').style.display='block';
+  const lg=document.getElementById('lg');
+  const pb=document.getElementById('pb');
+  const pm=document.getElementById('pm');
+  const log=m=>{lg.innerHTML+=`<div>▶ ${m}</div>`;lg.scrollTop=lg.scrollHeight;};
+  const prog=(p,m)=>{pb.style.width=p+'%';pm.textContent=m;};
+
+  prog(10,'도면 이미지 전송 중...');
+  log('Gemini Vision API 호출 중...');
+
+  const prompt=`당신은 건설공사 적산 전문가입니다. 포장 단면도를 분석하여 단위수량산출서 JSON을 반환하세요.
+
+규칙:
+- 단위기준: M2 (㎡당)
+- 산출근거: 곱셈 형식 "1.0*1.0*0.15" 또는 "0.15*1.04(4%할증)"
+- 터파기 깊이 = 전체 포장 총두께(m)
+- 잔토처리 = 터파기와 동일 산출근거/수량
+- 순서: 터파기→잔토처리→원지반다짐(있으면)→아래레이어부터위로
+- 각 레이어: 품(시공) 먼저 → 자재 순서
+- 할증: 혼합골재4%, 모래6%, 블록/판석5%, 콘크리트2%, 몰탈5%
+- 도면 두께/재료명/규격 정확히 반영
+
+순수 JSON만 반환 (마크다운 없이):
+{"pname":"포장명칭","rows":[
+  {"t":"mat","g":"터파기","s":"기계+인력","b":"1.0*1.0*0.20","q":0.200,"u":"M3"},
+  {"t":"pum","g":"보조기층포설","s":"T150","b":"1.0*1.0*0.15","q":0.150,"u":"M3"},
+  {"t":"mat","g":"보조기층","s":"혼합골재","b":"0.15*1.04(4%할증)","q":0.156,"u":"M3"}
+]}`;
+
+  try{
+    prog(30,'AI가 도면을 분석 중...');
+    const res=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[
+         {inlineData:{mimeType:imgMime,data:imgB64}},
+         {text:prompt}
+       ]}],generationConfig:{temperature:0.1}})}
+    );
+    prog(70,'응답 처리 중...');
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API 오류 '+res.status);}
+    const data=await res.json();
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    log('분석 완료, JSON 파싱 중...');
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    prog(90,'수량산출서 생성 중...');
+    renderRows(parsed);
+    prog(100,'✅ 완료!');
+    log('수량산출서 생성 완료!');
+  }catch(e){
+    prog(0,'❌ 오류');
+    log('오류: '+e.message);
+    setSt('err','❌ 오류: '+e.message+' (API 키 또는 이미지를 확인해주세요)');
+  }
+}
+
+// ── 렌더링
+function renderRows(parsed){
+  const er=document.getElementById('empty-row');
+  if(er)er.remove();
+  document.getElementById('tb').innerHTML='';
+  sid=0;
+  if(parsed.pname) document.getElementById('pname').value=parsed.pname;
+  (parsed.rows||[]).forEach(r=>{
+    if(r.t==='mat') _addMat(r.g,r.s,r.b,r.q,r.u);
+    else if(r.t==='pum') _addPum(r.g,r.s,r.b,r.q,r.u);
+    else if(r.t==='sec') _addSec(r.g||r.n||'');
+    else if(r.t==='note') _addNote(r.g||r.n||'');
+  });
+  // 비고 자동 추가
+  _addNote('※ 산출기준: M2당 / 실제면적(M2) × 각 수량 = 총수량');
+  _addNote('※ 2026년 건설공사 표준품셈 기준 적용');
+}
+
+function onBC(inp){
+  const v=evalB(inp.value);
+  if(v!==null){const qi=inp.closest('tr').querySelector('.qv input,.qv-p input');if(qi)qi.value=v;}
+}
+
+function _addSec(n){
+  sid++;const id='r'+sid;
+  const tr=document.createElement('tr');tr.className='sec';tr.id=id;
+  tr.innerHTML=`<td colspan="5" style="border:1px solid #aaa;padding:4px 8px;">
+    <input value="${esc(n)}" placeholder="구분명" style="border:none;outline:none;background:transparent;font-weight:bold;width:95%;font-family:inherit;font-size:12px;color:#2d5a27;letter-spacing:1px;">
+    </td><td class="no-print" style="border:1px solid #aaa;text-align:center;">
+    <button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button></td>`;
+  document.getElementById('tb').appendChild(tr);
+}
+function _addMat(g,s,b,q,u){
+  sid++;const id='r'+sid;
+  const tr=document.createElement('tr');tr.className='mat';tr.id=id;
+  tr.innerHTML=`
+    <td style="border:1px solid #ccc;font-weight:bold;"><input value="${esc(g)}" placeholder="자재명" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;background:transparent;font-weight:bold;"></td>
+    <td style="border:1px solid #ccc;"><input value="${esc(s)}" placeholder="규격" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;background:transparent;"></td>
+    <td class="basis" style="border:1px solid #ccc;"><input value="${esc(b)}" placeholder="산출근거" style="border:none;outline:none;width:100%;font-family:inherit;font-size:11px;background:transparent;color:#444;" oninput="onBC(this)"></td>
+    <td style="border:1px solid #ccc;text-align:center;"><input value="${esc(u||'M3')}" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;text-align:center;background:transparent;"></td>
+    <td class="qv" style="border:1px solid #ccc;"><input value="${q??''}" placeholder="0" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;text-align:right;font-weight:bold;color:#1a5c10;background:transparent;"></td>
+    <td class="no-print" style="border:1px solid #ccc;text-align:center;"><button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button></td>`;
+  document.getElementById('tb').appendChild(tr);
+}
+function _addPum(g,s,b,q,u){
+  sid++;const id='r'+sid;
+  const tr=document.createElement('tr');tr.className='pum';tr.id=id;
+  tr.innerHTML=`
+    <td style="border:1px solid #ccc;padding-left:14px;"><input value="${esc(g)}" placeholder="품 항목" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;background:transparent;color:#7a5f00;"></td>
+    <td style="border:1px solid #ccc;"><input value="${esc(s)}" placeholder="규격" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;background:transparent;"></td>
+    <td class="basis" style="border:1px solid #ccc;"><input value="${esc(b)}" placeholder="산출근거" style="border:none;outline:none;width:100%;font-family:inherit;font-size:11px;background:transparent;color:#444;" oninput="onBC(this)"></td>
+    <td style="border:1px solid #ccc;text-align:center;"><input value="${esc(u||'M2')}" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;text-align:center;background:transparent;"></td>
+    <td class="qv-p" style="border:1px solid #ccc;"><input value="${q??''}" placeholder="0" style="border:none;outline:none;width:100%;font-family:inherit;font-size:12px;text-align:right;font-weight:bold;color:#7a5f00;background:transparent;"></td>
+    <td class="no-print" style="border:1px solid #ccc;text-align:center;"><button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button></td>`;
+  document.getElementById('tb').appendChild(tr);
+}
+function _addNote(n){
+  sid++;const id='r'+sid;
+  const tr=document.createElement('tr');tr.className='nt';tr.id=id;
+  tr.innerHTML=`<td colspan="5" style="border:1px solid #ccc;padding:3px 10px;">
+    <input value="${esc(n)}" placeholder="※ 비고" style="border:none;outline:none;background:transparent;width:95%;font-family:inherit;font-size:11px;color:#666;">
+    </td><td class="no-print" style="border:1px solid #ccc;text-align:center;">
+    <button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button></td>`;
+  document.getElementById('tb').appendChild(tr);
+}
+
+// 툴바 버튼용
+function addMat(){_addMat('','','','','M3');}
+function addPum(){_addPum('','','','','M2');}
+function addSec(){_addSec('');}
+function addNote(){_addNote('');}
+function clearTb(){document.getElementById('tb').innerHTML='';sid=0;}
+
+// ── 엑셀
+function exportXlsx(){
+  const wb=XLSX.utils.book_new();
+  const pn=document.getElementById('pname').value||'포장';
+  const rows=[[pn,'','','','단위 : M2'],['공종','규격','산출근거','단위','수량']];
+  document.querySelectorAll('#tb tr').forEach(tr=>{
+    if(tr.classList.contains('sec')||tr.classList.contains('nt')){
+      rows.push([tr.querySelector('input')?.value||'','','','','']);
+    }else{
+      const ii=tr.querySelectorAll('input');
+      rows.push([ii[0]?.value||'',ii[1]?.value||'',ii[2]?.value||'',ii[3]?.value||'',ii[4]?.value||'']);
+    }
+  });
+  rows.push([],['※ M2당 기준 / 실제면적(M2) × 각 수량 = 총수량'],['※ 2026년 건설공사 표준품셈 기준']);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:20},{wch:15},{wch:36},{wch:7},{wch:9}];
+  XLSX.utils.book_append_sheet(wb,ws,'단위수량산출');
+  XLSX.writeFile(wb,`${pn}_단위수량산출_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── 초기화
+window.onload=()=>{
+  document.getElementById('md').value=new Date().toISOString().slice(0,10);
+  const k=localStorage.getItem('gk');
+  if(k){API_KEY=k;document.getElementById('api-key').value=k;setSt('ok','✅ 저장된 API 키 불러옴. 이미지를 업로드하세요.');}
+};
+</script>
+</body>
+</html>
